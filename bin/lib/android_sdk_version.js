@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /*
        Licensed to the Apache Software Foundation (ASF) under one
        or more contributor license agreements.  See the NOTICE file
@@ -19,46 +17,86 @@
        under the License.
 */
 
-var child_process = require('child_process'),
-    Q     = require('q');
+var Q = require('q');
+var superspawn = require('cordova-common').superspawn;
 
-var get_highest_sdk = function(results){
-    var reg = /\d+/;
-    var apiLevels = [];
-    for(var i=0;i<results.length;i++){
-        apiLevels[i] = parseInt(results[i].match(reg)[0]);
+var suffix_number_regex = /(\d+)$/;
+// Used for sorting Android targets, example strings to sort:
+//   android-19
+//   android-L
+//   Google Inc.:Google APIs:20
+//   Google Inc.:Glass Development Kit Preview:20
+// The idea is to sort based on largest "suffix" number - meaning the bigger
+// the number at the end, the more recent the target, the closer to the
+// start of the array.
+function sort_by_largest_numerical_suffix (a, b) {
+    var suffix_a = a.match(suffix_number_regex);
+    var suffix_b = b.match(suffix_number_regex);
+    if (suffix_a && suffix_b) {
+        // If the two targets being compared have suffixes, return less than
+        // zero, or greater than zero, based on which suffix is larger.
+        return (parseInt(suffix_a[1]) > parseInt(suffix_b[1]) ? -1 : 1);
+    } else {
+        // If no suffix numbers were detected, leave the order as-is between
+        // elements a and b.
+        return 0;
     }
-    apiLevels.sort(function(a,b){return b-a;});
-    console.log(apiLevels[0]);
-};
+}
 
-var get_sdks = function() {
-    var d = Q.defer();
-    child_process.exec('android list targets', function(err, stdout, stderr) {
-        if (err) d.reject(stderr);
-        else d.resolve(stdout);
-    });
-
-    return d.promise.then(function(output) {
-        var reg = /android-\d+/gi;
-        var results = output.match(reg);
-        if(results.length===0){
-            return Q.reject(new Error('No android sdks installed.'));
-        }else{
-            get_highest_sdk(results);
-        }
-
-        return Q();
-    }, function(stderr) {
-        if (stderr.match(/command\snot\sfound/) || stderr.match(/'android' is not recognized/)) {
-            return Q.reject(new Error('The command \"android\" failed. Make sure you have the latest Android SDK installed, and the \"android\" command (inside the tools/ folder) is added to your path.'));
-        } else {
-            return Q.reject(new Error('An error occurred while listing Android targets'));
-        }
+module.exports.print_newest_available_sdk_target = function () {
+    return module.exports.list_targets().then(function (targets) {
+        targets.sort(sort_by_largest_numerical_suffix);
+        console.log(targets[0]);
     });
 };
 
-module.exports.run = function() {
-    return Q.all([get_sdks()]);
+module.exports.version_string_to_api_level = {
+    '4.0': 14,
+    '4.0.3': 15,
+    '4.1': 16,
+    '4.2': 17,
+    '4.3': 18,
+    '4.4': 19,
+    '4.4W': 20,
+    '5.0': 21,
+    '5.1': 22,
+    '6.0': 23,
+    '7.0': 24,
+    '7.1.1': 25,
+    '8.0': 26
 };
 
+function parse_targets (output) {
+    var target_out = output.split('\n');
+    var targets = [];
+    for (var i = target_out.length - 1; i >= 0; i--) {
+        if (target_out[i].match(/id:/)) { // if "id:" is in the line...
+            targets.push(target_out[i].match(/"(.+)"/)[1]); // .. match whatever is in quotes.
+        }
+    }
+    return targets;
+}
+
+module.exports.list_targets_with_android = function () {
+    return superspawn.spawn('android', ['list', 'target']).then(parse_targets);
+};
+
+module.exports.list_targets_with_avdmanager = function () {
+    return superspawn.spawn('avdmanager', ['list', 'target']).then(parse_targets);
+};
+
+module.exports.list_targets = function () {
+    return module.exports.list_targets_with_avdmanager().catch(function (err) {
+        // If there's an error, like avdmanager could not be found, we can try
+        // as a last resort, to run `android`, in case this is a super old
+        // SDK installation.
+        if (err && (err.code === 'ENOENT' || (err.stderr && err.stderr.match(/not recognized/)))) {
+            return module.exports.list_targets_with_android();
+        } else throw err;
+    }).then(function (targets) {
+        if (targets.length === 0) {
+            return Q.reject(new Error('No android targets (SDKs) installed!'));
+        }
+        return targets;
+    });
+};

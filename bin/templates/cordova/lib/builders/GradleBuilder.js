@@ -145,15 +145,16 @@ GradleBuilder.prototype.prepEnv = function(opts) {
         /*jshint -W069 */
         var sdkDir = process.env['ANDROID_HOME'];
         /*jshint +W069 */
-        var wrapperDir = path.join(sdkDir, 'tools', 'templates', 'gradle', 'wrapper');
+        var wrapperDir = path.join(sdkDir, 'extras','google','google_play_services',
+                              'samples','unified','ActivityDemo');
         if (process.platform == 'win32') {
-            shell.rm('-f', path.join(self.root, 'gradlew.bat'));
+            //shell.rm('-f', path.join(self.root, 'gradlew.bat'));
             shell.cp(path.join(wrapperDir, 'gradlew.bat'), self.root);
         } else {
-            shell.rm('-f', path.join(self.root, 'gradlew'));
+            //shell.rm('-f', path.join(self.root, 'gradlew'));
             shell.cp(path.join(wrapperDir, 'gradlew'), self.root);
         }
-        shell.rm('-rf', path.join(self.root, 'gradle', 'wrapper'));
+        //shell.rm('-rf', path.join(self.root, 'gradle', 'wrapper'));
         shell.mkdir('-p', path.join(self.root, 'gradle'));
         shell.cp('-r', path.join(wrapperDir, 'gradle', 'wrapper'), path.join(self.root, 'gradle'));
 
@@ -162,7 +163,7 @@ GradleBuilder.prototype.prepEnv = function(opts) {
         // For some reason, using ^ and $ don't work.  This does the job, though.
         var distributionUrlRegex = /distributionUrl.*zip/;
         /*jshint -W069 */
-        var distributionUrl = process.env['CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL'] || 'http\\://services.gradle.org/distributions/gradle-2.14.1-all.zip';
+        var distributionUrl = process.env['CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL'] || 'http\\://services.gradle.org/distributions/gradle-3.3-all.zip';
         /*jshint +W069 */
         var gradleWrapperPropertiesPath = path.join(self.root, 'gradle', 'wrapper', 'gradle-wrapper.properties');
         shell.chmod('u+w', gradleWrapperPropertiesPath);
