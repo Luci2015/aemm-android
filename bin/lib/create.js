@@ -26,7 +26,7 @@ var shell = require('shelljs'),
     check_reqs = require('./check_reqs'),
     ROOT    = path.join(__dirname, '..', '..');
 
-var MIN_SDK_VERSION = 14;
+var MIN_SDK_VERSION = 19;
 
 var CordovaError = require('cordova-common').CordovaError;
 var AndroidManifest = require('../templates/cordova/lib/AndroidManifest');
@@ -54,54 +54,6 @@ function copyJs(projectPath) {
     // Copy cordova-js-src directory into platform_www directory.
     // We need these files to build cordova.js if using browserify method.
     shell.cp('-rf', path.join(ROOT, 'cordova-js-src'), path.join(projectPath, 'platform_www'));
-}
-
-function copyJsAndLibrary(projectPath, shared, projectName) {
-    var nestedCordovaLibPath = getFrameworkDir(projectPath, false);
-    var srcCordovaJsPath = path.join(ROOT, 'bin', 'templates', 'project', 'assets', 'www', 'cordova.js');
-    shell.cp('-f', srcCordovaJsPath, path.join(projectPath, 'assets', 'www', 'cordova.js'));
-
-    // Copy the cordova.js file to platforms/<platform>/platform_www/
-    // The www dir is nuked on each prepare so we keep cordova.js in platform_www
-    shell.mkdir('-p', path.join(projectPath, 'platform_www'));
-    shell.cp('-f', srcCordovaJsPath, path.join(projectPath, 'platform_www'));
-
-    // Copy cordova-js-src directory into platform_www directory.
-    // We need these files to build cordova.js if using browserify method.
-    shell.cp('-rf', path.join(ROOT, 'cordova-js-src'), path.join(projectPath, 'platform_www'));
-
-    // Don't fail if there are no old jars.
-    setShellFatal(false, function() {
-        shell.ls(path.join(projectPath, 'libs', 'cordova-*.jar')).forEach(function(oldJar) {
-            console.log('Deleting ' + oldJar);
-            shell.rm('-f', oldJar);
-        });
-        var wasSymlink = true;
-        try {
-            // Delete the symlink if it was one.
-            fs.unlinkSync(nestedCordovaLibPath);
-        } catch (e) {
-            wasSymlink = false;
-        }
-        // Delete old library project if it existed.
-        if (shared) {
-            shell.rm('-rf', nestedCordovaLibPath);
-        } else if (!wasSymlink) {
-            // Delete only the src, since Eclipse / Android Studio can't handle their project files being deleted.
-            shell.rm('-rf', path.join(nestedCordovaLibPath, 'src'));
-        }
-    });
-    if (shared) {
-        var relativeFrameworkPath = path.relative(projectPath, getFrameworkDir(projectPath, true));
-        fs.symlinkSync(relativeFrameworkPath, nestedCordovaLibPath, 'dir');
-    } else {
-        shell.mkdir('-p', nestedCordovaLibPath);
-        shell.cp('-f', path.join(ROOT, 'framework', 'AndroidManifest.xml'), nestedCordovaLibPath);
-        shell.cp('-f', path.join(ROOT, 'framework', 'project.properties'), nestedCordovaLibPath);
-        shell.cp('-f', path.join(ROOT, 'framework', 'build.gradle'), nestedCordovaLibPath);
-        shell.cp('-f', path.join(ROOT, 'framework', 'cordova.gradle'), nestedCordovaLibPath);
-        shell.cp('-r', path.join(ROOT, 'framework', 'src'), nestedCordovaLibPath);
-    }
 }
 
 function extractSubProjectPaths(data) {
